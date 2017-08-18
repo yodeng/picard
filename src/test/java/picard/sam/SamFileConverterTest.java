@@ -24,6 +24,7 @@
 
 package picard.sam;
 
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -32,7 +33,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 public class SamFileConverterTest {
 
@@ -41,40 +41,22 @@ public class SamFileConverterTest {
     private static final File unmappedBam = new File(TEST_DATA_DIR, "unmapped.bam");
     private static final File unmappedCram = new File(TEST_DATA_DIR, "unmapped.cram");
 
-    @Test
-    public void testSAMToBAM() {
-        convertFile(unmappedSam, unmappedBam, ".bam");
+    @DataProvider(name="samConverter")
+    public Object[][] samConverter() {
+        return new Object[][]{
+                {unmappedSam, unmappedBam, ".bam"},
+                {unmappedSam, unmappedCram, ".cram"},
+                {unmappedBam, unmappedCram, ".cram"},
+                {unmappedBam, unmappedSam, ".sam"},
+                {unmappedCram, unmappedBam, ".bam"},
+                {unmappedCram, unmappedSam, ".sam"}
+        };
     }
 
-    @Test
-    public void testSAMToCRAM() {
-        convertFile(unmappedSam, unmappedCram, ".cram");
-    }
-
-    @Test
-    public void testBAMToCRAM() {
-        convertFile(unmappedBam, unmappedCram, ".cram");
-    }
-
-    @Test
-    public void testBAMToSAM() {
-        convertFile(unmappedBam, unmappedSam, ".sam");
-    }
-
-    @Test
-    public void testCRAMToBAM() {
-        convertFile(unmappedCram, unmappedBam, ".bam");
-    }
-
-    @Test
-    public void testCRAMToSAM() {
-        convertFile(unmappedCram, unmappedSam, ".sam");
-    }
-
-
-    private void convertFile(final File inputFile, final File fileToCompare, final String extension) {
+    @Test(dataProvider="samConverter")
+    public void testSamFileConverter(final File inputFile, final File fileToCompare, final String extension) throws IOException {
         final SamFormatConverter samFormatConverter = new SamFormatConverter();
-        final List<File> samFiles = new ArrayList<File>();
+        final List<File> samFiles = new ArrayList<>();
         final ValidateSamFile validateSamFile = new ValidateSamFile();
         final CompareSAMs compareSAMs = new CompareSAMs();
 
@@ -85,17 +67,14 @@ public class SamFileConverterTest {
         } catch (final IOException e) {
             e.printStackTrace();
         }
-        samFormatConverter.doWork();
+        assertEquals(samFormatConverter.doWork(), 0);
 
         validateSamFile.INPUT = samFormatConverter.OUTPUT;
         assertEquals(validateSamFile.doWork(), 0);
 
         samFiles.add(samFormatConverter.OUTPUT);
         samFiles.add(fileToCompare);
-
         compareSAMs.samFiles = samFiles;
-        compareSAMs.doWork();
-
-        assertTrue(compareSAMs.areEqual());
+        assertEquals(compareSAMs.doWork(), 0);
     }
 }
