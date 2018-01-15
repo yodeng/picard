@@ -24,24 +24,20 @@
 package picard.sam;
 
 import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.samtools.SAMSequenceDictionaryCodec;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.reference.ReferenceSequenceFile;
 import htsjdk.samtools.reference.ReferenceSequenceFileFactory;
 import htsjdk.samtools.util.AsciiWriter;
-import htsjdk.samtools.util.CloseableIterator;
-import htsjdk.samtools.util.IOUtil;
 import htsjdk.samtools.util.Log;
 import htsjdk.samtools.util.Md5CalculatingOutputStream;
-import htsjdk.samtools.util.RuntimeIOException;
-import htsjdk.samtools.util.SortingCollection;
 import htsjdk.samtools.util.StringUtil;
 import org.broadinstitute.barclay.argparser.Argument;
+import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import org.broadinstitute.barclay.help.DocumentedFeature;
 import picard.PicardException;
 import picard.cmdline.CommandLineProgram;
-import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
+import picard.cmdline.StandardOptionDefinitions;
 import picard.cmdline.argumentcollections.ReferenceArgumentCollection;
 import picard.cmdline.programgroups.ReferenceProgramGroup;
 import picard.cmdline.StandardOptionDefinitions;
@@ -340,7 +336,7 @@ public class CreateSequenceDictionary extends CommandLineProgram {
 
         @Override
         public boolean hasNext() {
-            return nextRecord == null;
+            return nextRecord != null;
         }
     }
     /**
