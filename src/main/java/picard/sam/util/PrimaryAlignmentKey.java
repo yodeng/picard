@@ -2,13 +2,16 @@ package picard.sam.util;
 
 import htsjdk.samtools.SAMRecord;
 
+import java.util.Objects;
+
 /**
  * It is useful to define a key such that the key will occur at most once among the primary alignments in a given file
  * (assuming the file is valid). The read name + pairing status should be sufficient for this.
  */
 public final class PrimaryAlignmentKey implements Comparable<PrimaryAlignmentKey> {
 
-    private enum PairStatus {UNPAIRED, FIRST, SECOND} // note the order here; it should correspond to that of SAMRecordQueryNameComparator!
+    // note the order here; it should correspond to that of SAMRecordQueryNameComparator!
+    private enum PairStatus {UNPAIRED, FIRST, SECOND}
 
     private final PairStatus pairStatus;
     private final String readName;
@@ -25,7 +28,7 @@ public final class PrimaryAlignmentKey implements Comparable<PrimaryAlignmentKey
 
     @Override
     public int hashCode() {
-        return 31 * this.readName.hashCode() + this.pairStatus.hashCode();
+        return Objects.hash(readName, pairStatus);
     }
 
     @Override

@@ -34,9 +34,9 @@ import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 
-public class SamFileConverterTest {
+public class SamFormatConverterTest {
 
-    private static final File TEST_DATA_DIR = new File("testdata/picard/sam/SamFileConverterTest");
+    private static final File TEST_DATA_DIR = new File("testdata/picard/sam/SamFormatConverterTest");
     private static final File unmappedSam = new File(TEST_DATA_DIR, "unmapped.sam");
     private static final File unmappedBam = new File(TEST_DATA_DIR, "unmapped.bam");
     private static final File unmappedCram = new File(TEST_DATA_DIR, "unmapped.cram");
@@ -54,7 +54,7 @@ public class SamFileConverterTest {
     }
 
     @Test(dataProvider="samConverter")
-    public void testSamFileConverter(final File inputFile, final File fileToCompare, final String extension) throws IOException {
+    public void testSamFormatConverter(final File inputFile, final File fileToCompare, final String extension) throws IOException {
         final SamFormatConverter samFormatConverter = new SamFormatConverter();
         final List<File> samFiles = new ArrayList<>();
         final ValidateSamFile validateSamFile = new ValidateSamFile();
@@ -62,7 +62,7 @@ public class SamFileConverterTest {
 
         samFormatConverter.INPUT = inputFile;
         try {
-            samFormatConverter.OUTPUT = File.createTempFile("SamFileConverterTest." + inputFile.getName(), extension);
+            samFormatConverter.OUTPUT = File.createTempFile("SamFormatConverterTest." + inputFile.getName(), extension);
             samFormatConverter.OUTPUT.deleteOnExit();
         } catch (final IOException e) {
             e.printStackTrace();

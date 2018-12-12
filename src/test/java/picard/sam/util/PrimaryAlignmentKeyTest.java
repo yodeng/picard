@@ -6,6 +6,10 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
+
 /*
  * The MIT License
  *
@@ -38,36 +42,36 @@ public class PrimaryAlignmentKeyTest {
     public Object[][] positiveTestData() {
         return new Object[][]{
                 // unpaired < first
-                { makeRecordPair("r1", 0,
-                        "r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.FIRST_OF_PAIR.intValue()), -1 },
+                { makeRecordPair("r1", Collections.EMPTY_SET,
+                        "r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.FIRST_OF_PAIR)), -1 },
                 // unpaired < second
-                { makeRecordPair("r1", 0,
-                        "r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.SECOND_OF_PAIR.intValue()), -2 },
+                { makeRecordPair("r1", Collections.EMPTY_SET,
+                        "r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.SECOND_OF_PAIR)), -2 },
                 // first < second
-                { makeRecordPair("r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.FIRST_OF_PAIR.intValue(),
-                        "r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.SECOND_OF_PAIR.intValue()), -1 },
+                { makeRecordPair("r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.FIRST_OF_PAIR),
+                        "r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.SECOND_OF_PAIR)), -1 },
 
                 // first > unpaired
-                { makeRecordPair("r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.FIRST_OF_PAIR.intValue(),
-                        "r1", 0), 1 },
+                { makeRecordPair("r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.FIRST_OF_PAIR),
+                        "r1", Collections.EMPTY_SET), 1 },
                 // second > unpaired
-                { makeRecordPair("r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.SECOND_OF_PAIR.intValue(),
-                        "r1", 0), 2 },
+                { makeRecordPair("r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.SECOND_OF_PAIR),
+                        "r1", Collections.EMPTY_SET), 2 },
                 // second > first
-                { makeRecordPair("r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.SECOND_OF_PAIR.intValue(),
-                        "r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.FIRST_OF_PAIR.intValue()), 1 },
+                { makeRecordPair("r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.SECOND_OF_PAIR),
+                        "r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.FIRST_OF_PAIR)), 1 },
 
                 // unpaired == unpaired
-                { makeRecordPair("r1", 0, "r1", 0), 0 },
+                { makeRecordPair("r1", Collections.EMPTY_SET, "r1", Collections.EMPTY_SET), 0 },
                 // first == first
-                { makeRecordPair("r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.FIRST_OF_PAIR.intValue(),
-                        "r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.FIRST_OF_PAIR.intValue()), 0 },
+                { makeRecordPair("r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.FIRST_OF_PAIR),
+                        "r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.FIRST_OF_PAIR)), 0 },
                 // second == second
-                { makeRecordPair("r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.SECOND_OF_PAIR.intValue(),
-                        "r1", SAMFlag.READ_PAIRED.intValue() | SAMFlag.SECOND_OF_PAIR.intValue()), 0 },
+                { makeRecordPair("r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.SECOND_OF_PAIR),
+                        "r1", EnumSet.of(SAMFlag.READ_PAIRED, SAMFlag.SECOND_OF_PAIR)), 0 },
 
                 // different read names, "r1" < "r2"
-                { makeRecordPair("r1", 0, "r2", 0), -1 }
+                { makeRecordPair("r1", Collections.EMPTY_SET, "r2", Collections.EMPTY_SET), -1 }
         };
     }
 
@@ -81,8 +85,8 @@ public class PrimaryAlignmentKeyTest {
     @DataProvider(name="negativeTestData")
     public Object[][] negativeTestData() {
         return new Object[][]{
-                { makeSAMRecord("r1", SAMFlag.NOT_PRIMARY_ALIGNMENT.intValue()) },  // secondary!
-                { makeSAMRecord("r1", SAMFlag.SUPPLEMENTARY_ALIGNMENT.intValue()) }, //supplementary
+                { makeSAMRecord("r1", EnumSet.of(SAMFlag.NOT_PRIMARY_ALIGNMENT)) },  // secondary!
+                { makeSAMRecord("r1", EnumSet.of(SAMFlag.SUPPLEMENTARY_ALIGNMENT)) }, //supplementary
         };
     }
 
@@ -94,20 +98,20 @@ public class PrimaryAlignmentKeyTest {
 
     private Tuple<SAMRecord, SAMRecord> makeRecordPair(
             final String firstReadName,
-            final int firstReadFlags,
+            final Set<SAMFlag> firstReadFlags,
             final String secondReadName,
-            final int secondReadFlags) {
+            final Set<SAMFlag> secondReadFlags) {
         return new Tuple(
                 makeSAMRecord(firstReadName, firstReadFlags),
                 makeSAMRecord(secondReadName, secondReadFlags)
         );
     }
 
-    private SAMRecord makeSAMRecord(final String readName, final int readFlags)
+    private SAMRecord makeSAMRecord(final String readName, final Set<SAMFlag> readFlags)
     {
         final SAMRecord rec = new SAMRecord(samHeader);
         rec.setReadName(readName);
-        rec.setFlags(readFlags);
+        rec.setFlags(readFlags.stream().map(SAMFlag::intValue).reduce(0, (a, b) -> a | b));
         return rec;
     }
 
