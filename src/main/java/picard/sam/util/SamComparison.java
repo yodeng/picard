@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 /**
  * Rudimentary SAM comparer. Compares headers, and if headers are compatible enough, compares SAMRecords,
@@ -74,7 +75,7 @@ public final class SamComparison {
                 return compareUnsortedAlignments();
             default:
                 // unreachable
-                return false;
+                throw new PicardException(String.format("Unrecognized sort order (%s) found.", reader1.getFileHeader().getSortOrder()));
         }
     }
 
@@ -148,16 +149,7 @@ public final class SamComparison {
         }
         // The left iterator has been exhausted.  See if any of the remaining right reads
         // match any of the saved left reads.
-        for (; itRight.hasCurrent(); itRight.advance()) {
-            final SAMRecord right = itRight.getCurrent();
-            final PrimaryAlignmentKey rightKey = new PrimaryAlignmentKey(right);
-            final SAMRecord left = leftUnmatched.remove(rightKey);
-            if (left != null) {
-                tallyAlignmentRecords(left, right);
-            } else {
-                ++missingLeft;
-            }
-        }
+        consumeUnmatchedRights(itRight, leftUnmatched);
 
         // Look up reads that were unmatched from left, and see if they are in rightUnmatched.
         // If found, remove from rightUnmatched and tally.
@@ -235,26 +227,47 @@ public final class SamComparison {
         final SecondaryOrSupplementarySkippingIterator it2 = new SecondaryOrSupplementarySkippingIterator(reader2.iterator());
 
         final Map<PrimaryAlignmentKey, SAMRecord> leftUnmatched = new LinkedHashMap<>();
-        for (; it1.hasCurrent(); it1.advance()) {
-            final SAMRecord left = it1.getCurrent();
-            final PrimaryAlignmentKey leftKey = new PrimaryAlignmentKey(left);
-            leftUnmatched.put(leftKey, left);
-        }
 
-        for (; it2.hasCurrent(); it2.advance()) {
-            final SAMRecord right = it2.getCurrent();
-            final PrimaryAlignmentKey rightKey = new PrimaryAlignmentKey(right);
-            final SAMRecord left = leftUnmatched.remove(rightKey);
-            if (left != null) {
-                tallyAlignmentRecords(left, right);
-            } else {
-                ++missingLeft;
-            }
-        }
+        // Consume all of the lefts by adding them to the leftUnmatched map, then consume all of the
+        // rights by finding and removing their left mate from the "leftUnmatched" map. Anything remaining
+        // after that is unmatched.
+        consumeAll(it1, (alignmentRecord, primaryKey) -> leftUnmatched.put(primaryKey, alignmentRecord));
+        consumeUnmatchedRights(it2, leftUnmatched);
 
         missingRight += leftUnmatched.size();
 
         return allVisitedAlignmentsEqual();
+    }
+
+    /**
+     * Consume every record in the "right" iterator by either finding its matched "left", or
+     * failing that, incrementing the number of missing "lefts".
+     */
+    private void consumeUnmatchedRights(
+            final SecondaryOrSupplementarySkippingIterator rightIt,
+            final Map<PrimaryAlignmentKey, SAMRecord> leftUnmatched) {
+        consumeAll(rightIt,
+                (alignmentRecord, primaryKey) -> {
+                    final SAMRecord left = leftUnmatched.remove(primaryKey);
+                    if (left != null) {
+                        tallyAlignmentRecords(left, alignmentRecord);
+                    } else {
+                        ++missingLeft;
+                    }
+                });
+    }
+
+    /**
+     * Consume every record in the iterator, passing it and the corresponding PrimaryAlignmentKey.
+     * to the provided handler.
+     */
+    private void consumeAll(
+            final SecondaryOrSupplementarySkippingIterator it,
+            final BiConsumer<SAMRecord, PrimaryAlignmentKey> recordKeyHandler) {
+        for (; it.hasCurrent(); it.advance()) {
+            final SAMRecord record = it.getCurrent();
+            recordKeyHandler.accept(record, new PrimaryAlignmentKey(record));
+        }
     }
 
     /**
