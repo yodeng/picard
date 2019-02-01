@@ -39,8 +39,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static htsjdk.samtools.SAMRecord.NO_ALIGNMENT_REFERENCE_INDEX;
 import static htsjdk.samtools.SAMRecord.NO_ALIGNMENT_START;
@@ -119,7 +117,7 @@ public class ReorderSam extends CommandLineProgram {
             final SAMSequenceDictionary outputDictionary = SAMSequenceDictionaryExtractor.extractDictionary(SEQUENCE_DICTIONARY.toPath());
 
             if (outputDictionary == null) {
-                log.error("No reference sequence dictionary found. Aborting.  You can create a sequence dictionary for the reference fasta using CreateSequenceDictionary.jar.");
+                log.error("No reference sequence dictionary found. Aborting.  You can create a sequence dictionary for the reference fasta using the CreateSequenceDictionary command.");
                 return 1;
             }
 
@@ -129,7 +127,7 @@ public class ReorderSam extends CommandLineProgram {
             try {
                 newOrder = buildSequenceDictionaryMap(outputDictionary, in.getFileHeader().getSequenceDictionary());
             } catch (PicardException e) {
-                log.error(e.getMessage());
+                log.error(e);
                 return 1;
             }
             // has to be after we create the newOrder
@@ -138,7 +136,7 @@ public class ReorderSam extends CommandLineProgram {
 
             log.info("Writing reads...");
             if (in.hasIndex()) {
-                try (final SAMFileWriter out = new SAMFileWriterFactory().makeSAMOrBAMWriter(outHeader, true, OUTPUT)) {
+                try (final SAMFileWriter out = new SAMFileWriterFactory().makeSAMOrBAMWriter(outHeader, false, OUTPUT)) {
 
                     // write the reads in contig order
                     for (final SAMSequenceRecord contig : in.getFileHeader().getSequenceDictionary().getSequences()) {

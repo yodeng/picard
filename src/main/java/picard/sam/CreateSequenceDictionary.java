@@ -226,9 +226,8 @@ public class CreateSequenceDictionary extends CommandLineProgram {
             throw new PicardException("File " + OUTPUT.getAbsolutePath() + " not found");
         } catch (IOException e) {
             throw new PicardException("Can't write to or close output file " + OUTPUT.getAbsolutePath());
-        } catch (IllegalArgumentException e) {
+        } finally {
             OUTPUT.delete();
-            throw new PicardException(e.getMessage());
         }
 
         // check uniqueness of sequences names
