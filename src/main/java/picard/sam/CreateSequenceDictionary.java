@@ -38,7 +38,6 @@ import picard.cmdline.CommandLineProgram;
 import picard.cmdline.StandardOptionDefinitions;
 import picard.cmdline.argumentcollections.ReferenceArgumentCollection;
 import picard.cmdline.programgroups.ReferenceProgramGroup;
-import picard.cmdline.StandardOptionDefinitions;
 
 import java.io.*;
 import java.math.BigInteger;
@@ -99,10 +98,10 @@ public class CreateSequenceDictionary extends CommandLineProgram {
     public int NUM_SEQUENCES = Integer.MAX_VALUE;
 
     @Argument(shortName = "AN", doc = "Optional file containing the alternative names for the contigs. "
-    		+ "Tools may use this information to consider different contig notations as identical (e.g: 'chr1' and '1'). "
-    		+ "The alternative names will be put into the appropriate @AN annotation for each contig. "
-    		+ "No header. "
-    		+ "First column is the original name, the second column is an alternative name. "
+            + "Tools may use this information to consider different contig notations as identical (e.g: 'chr1' and '1'). "
+            + "The alternative names will be put into the appropriate @AN annotation for each contig. "
+            + "No header. "
+            + "First column is the original name, the second column is an alternative name. "
             + "One contig may have more than one alternative name." ,
             optional=true)
     public File ALT_NAMES = null;
@@ -224,8 +223,11 @@ public class CreateSequenceDictionary extends CommandLineProgram {
             throw new PicardException("File " + OUTPUT.getAbsolutePath() + " not found");
         } catch (IOException e) {
             throw new PicardException("Can't write to or close output file " + OUTPUT.getAbsolutePath());
-        } finally {
+        } catch (IllegalArgumentException e) {
+            // in case of an unexpected error delete the file so that there isn't a
+            // truncated result which might be valid and wrong.
             OUTPUT.delete();
+            throw new PicardException("Unknown problem. Partial dictionary file was deleted.", e);
         }
 
         // check uniqueness of sequences names

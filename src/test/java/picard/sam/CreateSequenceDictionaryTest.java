@@ -46,10 +46,10 @@ import java.util.stream.Collectors;
  * @author alecw@broadinstitute.org
  */
 public class CreateSequenceDictionaryTest extends CommandLineProgramTest {
-    public static File TEST_DATA_DIR = new File("testdata/picard");
-    public static File BASIC_FASTA = new File(TEST_DATA_DIR + "/sam", "basic.fasta");
-    public static File EQUIVALENCE_TEST_FASTA = new File(TEST_DATA_DIR + "/reference", "test.fasta");
-    public static File DUPLICATE_FASTA = new File(TEST_DATA_DIR + "/sam", "duplicate_sequence_names.fasta");
+    private static File TEST_DATA_DIR = new File("testdata/picard");
+    private static File BASIC_FASTA = new File(TEST_DATA_DIR + "/sam", "basic.fasta");
+    private static File EQUIVALENCE_TEST_FASTA = new File(TEST_DATA_DIR + "/reference", "test.fasta");
+    private static File DUPLICATE_FASTA = new File(TEST_DATA_DIR + "/sam", "duplicate_sequence_names.fasta");
 
     public String getCommandLineProgramName() {
         return CreateSequenceDictionary.class.getSimpleName();
