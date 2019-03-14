@@ -45,13 +45,16 @@ public class SamComparisonTest {
                 { "genomic_sorted.sam", "genomic_sorted.sam", 2, 0, 0, 0, 0, 0, 0, true },
                 { "genomic_sorted.sam", "has_non_primary.sam", 2, 0, 0, 0, 0, 0, 0, true },
                 { "genomic_sorted_5.sam", "genomic_sorted_5_plus.sam", 3, 2, 0, 0, 0, 3, 0, false },
+                { "genomic_sorted.sam", "genomic_sorted_sam_v1.6.sam", 2, 0, 0, 0, 0, 0, 0, false },
                 { "group_same_coord.sam", "group_same_coord_diff_order.sam", 3, 0, 0, 0, 0, 1, 2, false },
                 { "genomic_sorted_same_position.sam", "genomic_sorted_same_position.sam", 2, 0, 0, 0, 0, 0, 0, true },
                 { "group_same_coord.sam", "diff_coords.sam", 0, 5, 0, 0, 0, 0, 0, false },
                 { "genomic_sorted.sam", "unmapped_first.sam", 1, 0, 0, 0, 1, 0, 0, false },
                 { "genomic_sorted.sam", "unmapped_second.sam", 1, 0, 0, 0, 1, 0, 0, false },
                 { "unmapped_first.sam", "unmapped_second.sam", 0, 0, 0, 1, 1, 0, 0, false },
-                { "unmapped_first.sam", "unmapped_first.sam", 1, 0, 1, 0, 0, 0, 0, true }
+                { "unmapped_first.sam", "unmapped_first.sam", 1, 0, 1, 0, 0, 0, 0, true },
+                { "unsorted.sam", "unsorted.sam", 2, 0, 0, 0, 0, 0, 0, true },
+                { "unsorted.sam", "unsorted2.sam", 0, 1, 0, 0, 0, 0, 1, false }
         };
     }
 
