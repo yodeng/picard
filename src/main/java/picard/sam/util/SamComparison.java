@@ -363,7 +363,7 @@ public final class SamComparison {
         return ret;
     }
 
-    private boolean compareProgramRecord(final SAMProgramRecord programRecord1, final SAMProgramRecord programRecord2) {
+    private static boolean compareProgramRecord(final SAMProgramRecord programRecord1, final SAMProgramRecord programRecord2) {
         if (programRecord1 == null && programRecord2 == null) {
             return true;
         }
@@ -385,7 +385,7 @@ public final class SamComparison {
         return ret;
     }
 
-    private boolean compareReadGroups(final SAMFileHeader h1, final SAMFileHeader h2) {
+    private static boolean compareReadGroups(final SAMFileHeader h1, final SAMFileHeader h2) {
         final List<SAMReadGroupRecord> l1 = h1.getReadGroups();
         final List<SAMReadGroupRecord> l2 = h2.getReadGroups();
         if (!compareValues(l1.size(), l2.size(), "Number of read groups")) {
@@ -398,7 +398,7 @@ public final class SamComparison {
         return ret;
     }
 
-    private boolean compareReadGroup(final SAMReadGroupRecord samReadGroupRecord1, final SAMReadGroupRecord samReadGroupRecord2) {
+    private static boolean compareReadGroup(final SAMReadGroupRecord samReadGroupRecord1, final SAMReadGroupRecord samReadGroupRecord2) {
         boolean ret = compareValues(samReadGroupRecord1.getReadGroupId(), samReadGroupRecord2.getReadGroupId(),
                 "Read Group ID");
         ret = compareValues(samReadGroupRecord1.getSample(), samReadGroupRecord2.getSample(),
@@ -413,7 +413,7 @@ public final class SamComparison {
         return ret;
     }
 
-    private boolean compareSequenceDictionaries(final SAMFileHeader h1, final SAMFileHeader h2) {
+    private static boolean compareSequenceDictionaries(final SAMFileHeader h1, final SAMFileHeader h2) {
         final List<SAMSequenceRecord> s1 = h1.getSequenceDictionary().getSequences();
         final List<SAMSequenceRecord> s2 = h2.getSequenceDictionary().getSequences();
         if (s1.size() != s2.size()) {
@@ -427,7 +427,7 @@ public final class SamComparison {
         return ret;
     }
 
-    private boolean compareSequenceRecord(final SAMSequenceRecord sequenceRecord1, final SAMSequenceRecord sequenceRecord2, final int which) {
+    private static boolean compareSequenceRecord(final SAMSequenceRecord sequenceRecord1, final SAMSequenceRecord sequenceRecord2, final int which) {
         if (!sequenceRecord1.getSequenceName().equals(sequenceRecord2.getSequenceName())) {
             reportDifference(sequenceRecord1.getSequenceName(), sequenceRecord2.getSequenceName(),
                     "Name of sequence record " + which);
@@ -446,7 +446,7 @@ public final class SamComparison {
         return ret;
     }
 
-    private <T> boolean compareValues(final T v1, final T v2, final String label) {
+    private static <T> boolean compareValues(final T v1, final T v2, final String label) {
         boolean eq = Objects.equals(v1, v2);
         if (eq) {
             return true;
@@ -456,13 +456,13 @@ public final class SamComparison {
         }
     }
 
-    private void reportDifference(final String s1, final String s2, final String label) {
+    private static void reportDifference(final String s1, final String s2, final String label) {
         System.out.println(label + " differs.");
         System.out.println("File 1: " + s1);
         System.out.println("File 2: " + s2);
     }
 
-    private void reportDifference(Object o1, Object o2, final String label) {
+    private static void reportDifference(Object o1, Object o2, final String label) {
         if (o1 == null) {
             o1 = "null";
         }
