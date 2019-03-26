@@ -468,7 +468,7 @@ public class GtcToVcf extends CommandLineProgram {
          */
 
         final double meanX = r / (1 + Math.tan(theta * halfPi));
-        final double meanY = r - (r / (1 + Math.tan(theta * halfPi)));
+        final double meanY = r - meanX;
         final double devX = Math.pow(varianceX, 0.5);
         final double devY = Math.pow(varianceY, 0.5);
 
