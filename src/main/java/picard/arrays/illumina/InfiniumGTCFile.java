@@ -222,7 +222,7 @@ public class InfiniumGTCFile extends InfiniumDataFile {
             }
 
             if (normIndex != -1) {
-                InfiniumTransformation xform = normalizationTransformations[normIndex];
+                final InfiniumTransformation xform = normalizationTransformations[normIndex];
                 float tempX = rawX - xform.getOffsetX();
                 float tempY = rawY - xform.getOffsetY();
                 float theta = xform.getTheta();
