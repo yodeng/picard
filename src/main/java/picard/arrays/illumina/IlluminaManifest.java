@@ -59,8 +59,8 @@ public class IlluminaManifest  {
     public static final String NCBI_36 = "36";
     public static final String NCBI_37 = "37";
 
-    public static final HashMap<String, String> HG_TO_NCBI = new HashMap<>(3);
-    public static final HashMap<String, String> NCBI_TO_HG = new HashMap<>(3);
+    public static final Map<String, String> HG_TO_NCBI = new HashMap<>(3);
+    public static final Map<String, String> NCBI_TO_HG = new HashMap<>(3);
 
     static {
         HG_TO_NCBI.put(HG17, NCBI_35);
@@ -243,7 +243,7 @@ public class IlluminaManifest  {
         final String[] columns = line.trim().split(",");
         Map<String, Integer> columnNameToIndex = new HashMap<>();
         int index = 0;
-        Set<String> validHeaderNames = new HashSet<>(Arrays.asList(getAllPossibleHeaderNames()));
+        final Set<String> validHeaderNames = new HashSet<>(Arrays.asList(getAllPossibleHeaderNames()));
         for (String columnName : columns) {
             if (!validHeaderNames.contains(columnName)) {
                 throw new PicardException("Unrecognized Column '" + columnName + "' in Manifest file: " + manifestFile);
