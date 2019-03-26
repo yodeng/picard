@@ -451,10 +451,12 @@ public class GtcToVcf extends CommandLineProgram {
         final double rVariance = Math.pow(rDeviation, 2.0);
 
         final double halfPi = Math.PI / 2;
+        final double normalizedTheta = halfPi * theta;
+        final double rOverX = (1 + Math.tan(normalizedTheta));
 
         //calculate X and Y variances from R and Theta variances
-        final double thetaVarianceFactorX = -1 * (halfPi * r) * Math.pow((1 + Math.tan(halfPi * theta)), -2) * (1 / Math.pow(Math.cos(halfPi * theta), 2));
-        final double rVarianceFactorX = 1 / (1 + Math.tan(halfPi * theta));
+        final double thetaVarianceFactorX = -1 * (halfPi * r) * Math.pow((1 + Math.tan(normalizedTheta)), -2) * (1 / Math.pow(Math.cos(normalizedTheta), 2));
+        final double rVarianceFactorX = 1 / (1 + Math.tan(normalizedTheta));
         final double varianceX = (Math.pow(thetaVarianceFactorX, 2) * thetaVariance) + (Math.pow(rVarianceFactorX, 2) * rVariance);
         final double thetaVarianceFactorY = -1 * thetaVarianceFactorX;
         final double rVarianceFactorY = 1 - rVarianceFactorX;
@@ -464,10 +466,10 @@ public class GtcToVcf extends CommandLineProgram {
             Theta quantifies the relative amount of signal measured by the A and B intensities, defined by the equation:
             1/(2pi) * arctan(1/XY). R is a measurement of the total intensity observed from the A and B signals, defined as: R = A+B
             Illumina uses Manhattan distance https://en.wikipedia.org/wiki/Taxicab_geometry which is why R is A+B and not sqrt(A^2 + B^2)
-            So Theta = 1/(2pi) * arctan(1/XY) and R = X + Y
+            So Theta = 1/(2pi) * arctan(X/Y) and R = X + Y
          */
 
-        final double meanX = r / (1 + Math.tan(theta * halfPi));
+        final double meanX = r / rOverX;
         final double meanY = r - meanX;
         final double devX = Math.pow(varianceX, 0.5);
         final double devY = Math.pow(varianceY, 0.5);
