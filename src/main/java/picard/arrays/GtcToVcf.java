@@ -32,7 +32,7 @@ import picard.arrays.illumina.InfiniumEGTFile;
 import picard.arrays.illumina.InfiniumGTCFile;
 import picard.arrays.illumina.InfiniumNormalizationManifest;
 import picard.arrays.illumina.InfiniumVcfFields;
-import picard.util.Gender;
+import picard.pedigree.Sex;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.reference.ReferenceSequenceFile;
 import htsjdk.samtools.reference.ReferenceSequenceFileFactory;
@@ -67,13 +67,13 @@ import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import picard.PicardException;
 import picard.cmdline.CommandLineProgram;
 import picard.cmdline.StandardOptionDefinitions;
-import picard.cmdline.argumentcollections.ReferenceArgumentCollection;
 
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -91,19 +91,40 @@ import java.util.stream.Stream;
  * Class to convert a GTC file and a BPM file to a VCF file.
  */
 @CommandLineProgramProperties(
-        summary = "Program to convert a GTC file to a VCF.",
+        summary = GtcToVcf.USAGE_DETAILS,
         oneLineSummary = "Program to convert a GTC file to a VCF",
         programGroup = picard.cmdline.programgroups.GenotypingArraysProgramGroup.class
 )
 public class GtcToVcf extends CommandLineProgram {
 
+
+    static final String USAGE_DETAILS =
+            "<p>GtcToVcf takes an Illumina GTC file and converts it to a VCF file using several supporting files.</p>" +
+                    "<p>A GTC file is an abbreviation for Genotype Call file, a tab-delimited text file containing data about gene expression.</p>" +
+                    "<p>A VCF, aka Variant Calling Format, is a text file for storing how a sequenced sample differs from the reference genome. " +
+                    "<a href='http://software.broadinstitute.org/software/igv/book/export/html/184'></a></p>" +
+                    "<p>The name of the INPUT must match the name of the EXTENDED_ILLUMINA_MANIFEST, sans file extensions.</p>" +
+                    "<h3>Usage example:</h3>" +
+                    "<pre>" +
+                    "GtcToVcf\n" +
+                    "\t--INPUT input.gtc\n" +
+                    "\t--REFERENCE_SEQUENCE reference.fasta\n" +
+                    "\t--OUTPUT output.vcf\n" +
+                    "\t--EXTENDED_ILLUMINA_MANIFEST input.csv\n" +
+                    "\t--CLUSTER_FILE cluster.egt\n" +
+                    "\t--ILLUMINA_NORMALIZATION_MANIFEST normalization_manifest.bpm.csv\n" +
+                    "\t--SAMPLE_ALIAS my_sample_alias\n" +
+                    "\t--ANALYSIS_VERSION_NUMBER 0\n" +
+                    "\t--EXPECTED_GENDER UNKNOWN\n" +
+                    "\t--GENDER_GTC gender.gtc\n" +
+                    "\t--ZCALL_THRESHOLDS_FILE thresholds.\n" +
+                    "\t--FINGERPRINT_GENOTYPES_VCF_FILE fingerprint_genotypes.vcf" +
+                    "</pre><hr />";
+
     private final Log log = Log.getInstance(GtcToVcf.class);
 
     @Argument(shortName = StandardOptionDefinitions.INPUT_SHORT_NAME, doc = "GTC file to be converted")
     public File INPUT;
-
-    @Argument(shortName = "GENDER_GTC", doc = "GTC file that was called using the gender cluster file.", optional = true)
-    public File GENDER_GTC;
 
     @Argument(shortName = StandardOptionDefinitions.OUTPUT_SHORT_NAME, doc = "The output VCF file to write.")
     public File OUTPUT;
@@ -117,20 +138,23 @@ public class GtcToVcf extends CommandLineProgram {
     @Argument(shortName = "NORM_MANIFEST", doc = "An Infinium manifest containing the normalization ids (bpm.csv)")
     public File ILLUMINA_NORMALIZATION_MANIFEST;
 
-    @Argument(shortName = "ZCALL_T_FILE", doc = "The zcall thresholds file.", optional = true)
-    public File ZCALL_THRESHOLDS_FILE = null;
-
     @Argument(shortName = "E_GENDER", doc = "The expected gender for this sample.")
     public String EXPECTED_GENDER;
-
-    @Argument(shortName = "FP_VCF", doc = "The fingerprint VCF for this sample", optional = true)
-    public File FINGERPRINT_GENOTYPES_VCF_FILE;
 
     @Argument(doc = "The sample alias")
     public String SAMPLE_ALIAS;
 
     @Argument(doc = "The analysis version of the data used to generate this VCF")
     public Integer ANALYSIS_VERSION_NUMBER;
+
+    @Argument(shortName = "G_GTC", doc = "GTC file that was called using the gender cluster file.", optional = true)
+    public File GENDER_GTC;
+
+    @Argument(shortName = "ZCALL_T_FILE", doc = "The zcall thresholds file.", optional = true)
+    public File ZCALL_THRESHOLDS_FILE = null;
+
+    @Argument(shortName = "FP_VCF", doc = "The fingerprint VCF for this sample", optional = true)
+    public File FINGERPRINT_GENOTYPES_VCF_FILE;
 
     private static final List<Allele> NO_CALL_ALLELES = Collections.unmodifiableList(Arrays.asList(Allele.NO_CALL, Allele.NO_CALL));
 
@@ -144,41 +168,27 @@ public class GtcToVcf extends CommandLineProgram {
 
     private static HashMap<String, String[]> zCallThresholds = new HashMap<>();
 
-    private static Gender fingerprintGender;
+    private static Sex fingerprintGender;
 
     private static final DecimalFormat df = new DecimalFormat();
+
+    private static final String dot = ".";
 
     static {
         df.setMaximumFractionDigits(3);
     }
 
-    // Return a custom (required) argument collection, override doc string
+
     @Override
-    protected ReferenceArgumentCollection makeReferenceArgumentCollection() {
-        return new ReferenceArgumentCollection() {
-
-            @Argument(shortName = StandardOptionDefinitions.REFERENCE_SHORT_NAME, doc = "The reference sequence to map the genotypes to.")
-            public File REFERENCE_SEQUENCE;
-
-            @Override
-            public File getReferenceFile() {
-                return REFERENCE_SEQUENCE;
-            }
-        };
-    }
-
-    // Stock main method
-    public static void main(final String[] args) {
-        new GtcToVcf().instanceMainWithExit(args);
+    protected boolean requiresReference() {
+        return true;
     }
 
     @Override
     protected int doWork() {
+        final ExtendedIlluminaManifest manifest = setupAndGetManifest();
 
-        try {
-            final ReferenceSequenceFile refSeq = ReferenceSequenceFileFactory.getReferenceSequenceFile(REFERENCE_SEQUENCE);
-
-            final ExtendedIlluminaManifest manifest = new ExtendedIlluminaManifest(EXTENDED_ILLUMINA_MANIFEST);
+        try (final ReferenceSequenceFile refSeq = ReferenceSequenceFileFactory.getReferenceSequenceFile(REFERENCE_SEQUENCE)) {
 
             final VCFHeader vcfHeader = createVCFHeader(manifest, infiniumGTCFile, gtcGender, CLUSTER_FILE,
                     REFERENCE_SEQUENCE, refSeq.getSequenceDictionary());
@@ -191,7 +201,7 @@ public class GtcToVcf extends CommandLineProgram {
                             new VCFRecordCodec(vcfHeader),
                             new VariantContextComparator(refSeq.getSequenceDictionary()),
                             MAX_RECORDS_IN_RAM,
-                            TMP_DIR);
+                            TMP_DIR.stream().map(File::toPath).toArray(Path[]::new));
 
             // fill the sorting collection
             fillContexts(contexts, infiniumGTCFile, manifest, infiniumEGTFile);
@@ -217,28 +227,37 @@ public class GtcToVcf extends CommandLineProgram {
         if (GENDER_GTC != null) {
             IOUtil.assertFileIsReadable(GENDER_GTC);
         }
+        if (ZCALL_THRESHOLDS_FILE != null) {
+            IOUtil.assertFileIsReadable(ZCALL_THRESHOLDS_FILE);
+        }
 
-        try {
-            fingerprintGender = getFingerprintGender(FINGERPRINT_GENOTYPES_VCF_FILE);
-            InfiniumNormalizationManifest infiniumNormalizationManifest = new InfiniumNormalizationManifest(ILLUMINA_NORMALIZATION_MANIFEST);
+        return super.customCommandLineValidation();
+    }
+
+    private ExtendedIlluminaManifest setupAndGetManifest() {
+        fingerprintGender = getFingerprintSex(FINGERPRINT_GENOTYPES_VCF_FILE);
+        final InfiniumNormalizationManifest infiniumNormalizationManifest = new InfiniumNormalizationManifest(ILLUMINA_NORMALIZATION_MANIFEST);
+        try (final DataInputStream gtcInputStream = new DataInputStream(new FileInputStream(INPUT))) {
+
             infiniumEGTFile = new InfiniumEGTFile(CLUSTER_FILE);
-            infiniumGTCFile = new InfiniumGTCFile(new DataInputStream(new FileInputStream(INPUT)), infiniumNormalizationManifest);
+            infiniumGTCFile = new InfiniumGTCFile(gtcInputStream, infiniumNormalizationManifest);
+            final ExtendedIlluminaManifest manifest = new ExtendedIlluminaManifest(EXTENDED_ILLUMINA_MANIFEST);
+
+            if (GENDER_GTC != null) {
+                try (DataInputStream genderGtcStream = new DataInputStream(new FileInputStream(GENDER_GTC))) {
+                    gtcGender = new InfiniumGTCFile(genderGtcStream, infiniumNormalizationManifest).getGender();
+                }
+            }
+
             if (ZCALL_THRESHOLDS_FILE != null) {
                 parseZCallThresholds();
             }
-            if (GENDER_GTC != null) {
-                gtcGender = new InfiniumGTCFile(new DataInputStream(new FileInputStream(GENDER_GTC)), infiniumNormalizationManifest).getGender();
-            }
-
-            final ExtendedIlluminaManifest manifest = new ExtendedIlluminaManifest(EXTENDED_ILLUMINA_MANIFEST);
 
             final String gtcManifestName = FilenameUtils.removeExtension(infiniumGTCFile.getSnpManifest());
             final String illuminaManifestName = FilenameUtils.removeExtension(manifest.getDescriptorFileName());
 
-            final List<String> errors = new ArrayList<>();
-
             if (!gtcManifestName.equalsIgnoreCase(illuminaManifestName)) {
-                errors.add("The GTC's manifest name " + gtcManifestName +
+                throw new PicardException("The GTC's manifest name " + gtcManifestName +
                         " does not match the Illumina manifest name " + illuminaManifestName);
             }
 
@@ -246,25 +265,22 @@ public class GtcToVcf extends CommandLineProgram {
                 log.warn("The number of SNPs in the GTC file: " + infiniumGTCFile.getNumberOfSnps() +
                         " does not equal the number of SNPs in the Illumina manifest file: " + manifest.getNumAssays());
             }
-
-            return (errors.size() > 0)
-                    ? errors.toArray(new String[errors.size()])
-                    : null;
-
-        } catch (IOException ioe) {
-            throw new PicardException(ioe.getMessage(), ioe.getCause());
+            return manifest;
+        } catch (IOException e) {
+            throw new PicardException("Failed to setup");
         }
     }
 
     private void parseZCallThresholds() {
+        final String notApplicable = "NA";
         try (Stream<String> stream = Files.lines(ZCALL_THRESHOLDS_FILE.toPath())) {
 
             stream.forEach(line -> {
                 String[] tokens = line.split("\t");
-                if ((!tokens[1].equals("NA")) && (!tokens[2].equals("NA"))) {
+                if ((!tokens[1].equals(notApplicable)) && (!tokens[2].equals(notApplicable))) {
                     zCallThresholds.put(tokens[0], new String[]{tokens[1], tokens[2]});
                 } else {
-                    zCallThresholds.put(tokens[0], new String[]{".", "."});
+                    zCallThresholds.put(tokens[0], new String[]{dot, dot});
                 }
             });
 
@@ -273,17 +289,18 @@ public class GtcToVcf extends CommandLineProgram {
         }
     }
 
-    Gender getFingerprintGender(final File file) {
+    Sex getFingerprintSex(final File file) {
         if (file == null) {
-            return Gender.UNKNOWN;
+            return Sex.Unknown;
         } else {
-            VCFFileReader reader = new VCFFileReader(file, false);
-            VCFHeader header = reader.getFileHeader();
-            VCFHeaderLine gender = header.getMetaDataLine("gender");
-            if (gender != null) {
-                return Gender.fromString(gender.getValue());
-            } else {
-                return Gender.UNKNOWN;
+            try (VCFFileReader reader = new VCFFileReader(file, false)) {
+                final VCFHeader header = reader.getFileHeader();
+                final VCFHeaderLine gender = header.getMetaDataLine("gender");
+                if (gender != null) {
+                    return Sex.valueOf(gender.getValue());
+                } else {
+                    return Sex.Unknown;
+                }
             }
         }
     }
@@ -300,121 +317,124 @@ public class GtcToVcf extends CommandLineProgram {
         while (iterator.hasNext()) {
             final ExtendedIlluminaManifestRecord record = iterator.next();
 
-            if (!record.isBad()) {          // If the record is not flagged as errant in the manifest we include it in the VCF
-                Allele A = record.getAlleleA();
-                Allele B = record.getAlleleB();
-                Allele ref = record.getRefAllele();
-
-                //if A, B and ref are all . then parse the alleles from the probeSeq
-                if (A.isNoCall() && B.isNoCall() && ref.isNoCall()) {
-                    String sourceSeq = record.getSourceSeq();
-                    String alleles = sourceSeq.substring(sourceSeq.indexOf('['), sourceSeq.lastIndexOf(']') + 1);
-                    if (alleles.charAt(1) == '-') {
-                        A = Allele.SPAN_DEL;
-                        B = ref = Allele.create(alleles.substring(alleles.indexOf("/") + 1, alleles.lastIndexOf(']')), true);
-                    } else {
-                        A = ref = Allele.create(alleles.substring(alleles.indexOf("[") + 1, alleles.lastIndexOf('/')), true);
-                        B = Allele.create(alleles.substring(alleles.indexOf("/") + 1, alleles.lastIndexOf(']')));
-                    }
-                }
-
-                final String chr = record.getB37Chr();
-                final Integer position = record.getB37Pos();
-                final Integer endPosition = position + ref.length() - 1;
-
-                progress.record(chr, position);
-
-                // Create list of unique alleles
-                final List<Allele> assayAlleles = new ArrayList<>();
-                assayAlleles.add(ref);
-
-                if (!ref.equals(A, true)) {
-                    assayAlleles.add(A);
-                }
-
-                if (!ref.equals(B, true)) {
-                    assayAlleles.add(B);
-                }
-
-                final Genotype genotype = getGenotype(gtcFile, record, gtcIndex, A, B);
-
-                final VariantContextBuilder builder = new VariantContextBuilder();
-
-                builder.source(record.getName());
-                builder.chr(chr);
-                builder.start(position);
-                builder.stop(endPosition);
-                builder.alleles(assayAlleles);
-                builder.log10PError(VariantContext.NO_LOG10_PERROR);
-                builder.id(record.getName());
-                builder.genotypes(genotype);
-
-                VariantContextUtils.calculateChromosomeCounts(builder, false);
-
-                //custom info fields
-                builder.attribute(InfiniumVcfFields.ALLELE_A, record.getAlleleA());
-                builder.attribute(InfiniumVcfFields.ALLELE_B, record.getAlleleB());
-                builder.attribute(InfiniumVcfFields.ILLUMINA_STRAND, record.getIlmnStrand());
-                builder.attribute(InfiniumVcfFields.PROBE_A, record.getAlleleAProbeSeq());
-                builder.attribute(InfiniumVcfFields.PROBE_B, record.getAlleleBProbeSeq());
-                builder.attribute(InfiniumVcfFields.BEADSET_ID, record.getBeadSetId());
-                builder.attribute(InfiniumVcfFields.ILLUMINA_CHR, record.getChr());
-                builder.attribute(InfiniumVcfFields.ILLUMINA_POS, record.getPosition());
-                builder.attribute(InfiniumVcfFields.ILLUMINA_BUILD, record.getGenomeBuild());
-                builder.attribute(InfiniumVcfFields.SOURCE, record.getSource().replace(' ', '_'));
-                builder.attribute(InfiniumVcfFields.GC_SCORE, formatFloatForVcf(egtFile.totalScore[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.N_AA, egtFile.nAA[gtcIndex]);
-                builder.attribute(InfiniumVcfFields.N_AB, egtFile.nAB[gtcIndex]);
-                builder.attribute(InfiniumVcfFields.N_BB, egtFile.nBB[gtcIndex]);
-                builder.attribute(InfiniumVcfFields.DEV_R_AA, formatFloatForVcf(egtFile.devRAA[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.DEV_R_AB, formatFloatForVcf(egtFile.devRAB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.DEV_R_BB, formatFloatForVcf(egtFile.devRBB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.MEAN_R_AA, formatFloatForVcf(egtFile.meanRAA[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.MEAN_R_AB, formatFloatForVcf(egtFile.meanRAB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.MEAN_R_BB, formatFloatForVcf(egtFile.meanRBB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.DEV_THETA_AA, formatFloatForVcf(egtFile.devThetaAA[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.DEV_THETA_AB, formatFloatForVcf(egtFile.devThetaAB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.DEV_THETA_BB, formatFloatForVcf(egtFile.devThetaBB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.MEAN_THETA_AA, formatFloatForVcf(egtFile.meanThetaAA[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.MEAN_THETA_AB, formatFloatForVcf(egtFile.meanThetaAB[gtcIndex]));
-                builder.attribute(InfiniumVcfFields.MEAN_THETA_BB, formatFloatForVcf(egtFile.meanThetaBB[gtcIndex]));
-
-                EuclideanValues aaVals = polarToEuclidean(egtFile.meanRAA[gtcIndex], egtFile.devRAA[gtcIndex],
-                        egtFile.meanThetaAA[gtcIndex], egtFile.devThetaAA[gtcIndex]);
-                EuclideanValues abVals = polarToEuclidean(egtFile.meanRAB[gtcIndex], egtFile.devRAB[gtcIndex],
-                        egtFile.meanThetaAB[gtcIndex], egtFile.devThetaAB[gtcIndex]);
-                EuclideanValues bbVals = polarToEuclidean(egtFile.meanRBB[gtcIndex], egtFile.devRBB[gtcIndex],
-                        egtFile.meanThetaBB[gtcIndex], egtFile.devThetaBB[gtcIndex]);
-
-                builder.attribute(InfiniumVcfFields.DEV_X_AA, formatFloatForVcf(aaVals.devX));
-                builder.attribute(InfiniumVcfFields.DEV_X_AB, formatFloatForVcf(abVals.devX));
-                builder.attribute(InfiniumVcfFields.DEV_X_BB, formatFloatForVcf(bbVals.devX));
-                builder.attribute(InfiniumVcfFields.MEAN_X_AA, formatFloatForVcf(aaVals.meanX));
-                builder.attribute(InfiniumVcfFields.MEAN_X_AB, formatFloatForVcf(abVals.meanX));
-                builder.attribute(InfiniumVcfFields.MEAN_X_BB, formatFloatForVcf(bbVals.meanX));
-                builder.attribute(InfiniumVcfFields.DEV_Y_AA, formatFloatForVcf(aaVals.devY));
-                builder.attribute(InfiniumVcfFields.DEV_Y_AB, formatFloatForVcf(abVals.devY));
-                builder.attribute(InfiniumVcfFields.DEV_Y_BB, formatFloatForVcf(bbVals.devY));
-                builder.attribute(InfiniumVcfFields.MEAN_Y_AA, formatFloatForVcf(aaVals.meanY));
-                builder.attribute(InfiniumVcfFields.MEAN_Y_AB, formatFloatForVcf(abVals.meanY));
-                builder.attribute(InfiniumVcfFields.MEAN_Y_BB, formatFloatForVcf(bbVals.meanY));
-                if (zCallThresholds.containsKey(egtFile.rsNames[gtcIndex])) {
-                    String[] zThresh = zCallThresholds.get(egtFile.rsNames[gtcIndex]);
-                    builder.attribute(InfiniumVcfFields.ZTHRESH_X, zThresh[0]);
-                    builder.attribute(InfiniumVcfFields.ZTHRESH_Y, zThresh[1]);
-                }
-                final String rsid = record.getRsId();
-                if (StringUtils.isNotEmpty(rsid)) {
-                    builder.attribute(InfiniumVcfFields.RS_ID, rsid);
-                }
-
-                if (record.isDupe()) {
-                    builder.filter(InfiniumVcfFields.DUPE);
-                }
-
-                numVariantsWritten++;
-                contexts.add(builder.make());
+            if (record.isBad()) {
+                continue;
             }
+            // If the record is not flagged as errant in the manifest we include it in the VCF
+            Allele A = record.getAlleleA();
+            Allele B = record.getAlleleB();
+            Allele ref = record.getRefAllele();
+
+            //if A, B and ref are all . then parse the alleles from the probeSeq
+            if (A.isNoCall() && B.isNoCall() && ref.isNoCall()) {
+                final String sourceSeq = record.getSourceSeq();
+                final String alleles = sourceSeq.substring(sourceSeq.indexOf('['), sourceSeq.lastIndexOf(']') + 1);
+                if (alleles.charAt(1) == '-') {
+                    A = Allele.SPAN_DEL;
+                    B = ref = Allele.create(alleles.substring(alleles.indexOf("/") + 1, alleles.lastIndexOf(']')), true);
+                } else {
+                    A = ref = Allele.create(alleles.substring(alleles.indexOf("[") + 1, alleles.lastIndexOf('/')), true);
+                    B = Allele.create(alleles.substring(alleles.indexOf("/") + 1, alleles.lastIndexOf(']')));
+                }
+            }
+
+            final String chr = record.getB37Chr();
+            final Integer position = record.getB37Pos();
+            final Integer endPosition = position + ref.length() - 1;
+
+            progress.record(chr, position);
+
+            // Create list of unique alleles
+            final List<Allele> assayAlleles = new ArrayList<>();
+            assayAlleles.add(ref);
+
+            if (!ref.equals(A, true)) {
+                assayAlleles.add(A);
+            }
+
+            if (!ref.equals(B, true)) {
+                assayAlleles.add(B);
+            }
+
+            final Genotype genotype = getGenotype(gtcFile, record, gtcIndex, A, B);
+
+            final VariantContextBuilder builder = new VariantContextBuilder();
+
+            builder.source(record.getName());
+            builder.chr(chr);
+            builder.start(position);
+            builder.stop(endPosition);
+            builder.alleles(assayAlleles);
+            builder.log10PError(VariantContext.NO_LOG10_PERROR);
+            builder.id(record.getName());
+            builder.genotypes(genotype);
+
+            VariantContextUtils.calculateChromosomeCounts(builder, false);
+
+            //custom info fields
+            builder.attribute(InfiniumVcfFields.ALLELE_A, record.getAlleleA());
+            builder.attribute(InfiniumVcfFields.ALLELE_B, record.getAlleleB());
+            builder.attribute(InfiniumVcfFields.ILLUMINA_STRAND, record.getIlmnStrand());
+            builder.attribute(InfiniumVcfFields.PROBE_A, record.getAlleleAProbeSeq());
+            builder.attribute(InfiniumVcfFields.PROBE_B, record.getAlleleBProbeSeq());
+            builder.attribute(InfiniumVcfFields.BEADSET_ID, record.getBeadSetId());
+            builder.attribute(InfiniumVcfFields.ILLUMINA_CHR, record.getChr());
+            builder.attribute(InfiniumVcfFields.ILLUMINA_POS, record.getPosition());
+            builder.attribute(InfiniumVcfFields.ILLUMINA_BUILD, record.getGenomeBuild());
+            builder.attribute(InfiniumVcfFields.SOURCE, record.getSource().replace(' ', '_'));
+            builder.attribute(InfiniumVcfFields.GC_SCORE, formatFloatForVcf(egtFile.totalScore[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.N_AA, egtFile.nAA[gtcIndex]);
+            builder.attribute(InfiniumVcfFields.N_AB, egtFile.nAB[gtcIndex]);
+            builder.attribute(InfiniumVcfFields.N_BB, egtFile.nBB[gtcIndex]);
+            builder.attribute(InfiniumVcfFields.DEV_R_AA, formatFloatForVcf(egtFile.devRAA[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.DEV_R_AB, formatFloatForVcf(egtFile.devRAB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.DEV_R_BB, formatFloatForVcf(egtFile.devRBB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.MEAN_R_AA, formatFloatForVcf(egtFile.meanRAA[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.MEAN_R_AB, formatFloatForVcf(egtFile.meanRAB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.MEAN_R_BB, formatFloatForVcf(egtFile.meanRBB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.DEV_THETA_AA, formatFloatForVcf(egtFile.devThetaAA[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.DEV_THETA_AB, formatFloatForVcf(egtFile.devThetaAB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.DEV_THETA_BB, formatFloatForVcf(egtFile.devThetaBB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.MEAN_THETA_AA, formatFloatForVcf(egtFile.meanThetaAA[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.MEAN_THETA_AB, formatFloatForVcf(egtFile.meanThetaAB[gtcIndex]));
+            builder.attribute(InfiniumVcfFields.MEAN_THETA_BB, formatFloatForVcf(egtFile.meanThetaBB[gtcIndex]));
+
+            EuclideanValues aaVals = polarToEuclidean(egtFile.meanRAA[gtcIndex], egtFile.devRAA[gtcIndex],
+                    egtFile.meanThetaAA[gtcIndex], egtFile.devThetaAA[gtcIndex]);
+            EuclideanValues abVals = polarToEuclidean(egtFile.meanRAB[gtcIndex], egtFile.devRAB[gtcIndex],
+                    egtFile.meanThetaAB[gtcIndex], egtFile.devThetaAB[gtcIndex]);
+            EuclideanValues bbVals = polarToEuclidean(egtFile.meanRBB[gtcIndex], egtFile.devRBB[gtcIndex],
+                    egtFile.meanThetaBB[gtcIndex], egtFile.devThetaBB[gtcIndex]);
+
+            builder.attribute(InfiniumVcfFields.DEV_X_AA, formatFloatForVcf(aaVals.devX));
+            builder.attribute(InfiniumVcfFields.DEV_X_AB, formatFloatForVcf(abVals.devX));
+            builder.attribute(InfiniumVcfFields.DEV_X_BB, formatFloatForVcf(bbVals.devX));
+            builder.attribute(InfiniumVcfFields.MEAN_X_AA, formatFloatForVcf(aaVals.meanX));
+            builder.attribute(InfiniumVcfFields.MEAN_X_AB, formatFloatForVcf(abVals.meanX));
+            builder.attribute(InfiniumVcfFields.MEAN_X_BB, formatFloatForVcf(bbVals.meanX));
+            builder.attribute(InfiniumVcfFields.DEV_Y_AA, formatFloatForVcf(aaVals.devY));
+            builder.attribute(InfiniumVcfFields.DEV_Y_AB, formatFloatForVcf(abVals.devY));
+            builder.attribute(InfiniumVcfFields.DEV_Y_BB, formatFloatForVcf(bbVals.devY));
+            builder.attribute(InfiniumVcfFields.MEAN_Y_AA, formatFloatForVcf(aaVals.meanY));
+            builder.attribute(InfiniumVcfFields.MEAN_Y_AB, formatFloatForVcf(abVals.meanY));
+            builder.attribute(InfiniumVcfFields.MEAN_Y_BB, formatFloatForVcf(bbVals.meanY));
+            if (zCallThresholds.containsKey(egtFile.rsNames[gtcIndex])) {
+                String[] zThresh = zCallThresholds.get(egtFile.rsNames[gtcIndex]);
+                builder.attribute(InfiniumVcfFields.ZTHRESH_X, zThresh[0]);
+                builder.attribute(InfiniumVcfFields.ZTHRESH_Y, zThresh[1]);
+            }
+            final String rsid = record.getRsId();
+            if (StringUtils.isNotEmpty(rsid)) {
+                builder.attribute(InfiniumVcfFields.RS_ID, rsid);
+            }
+
+            if (record.isDupe()) {
+                builder.filter(InfiniumVcfFields.DUPE);
+            }
+
+            numVariantsWritten++;
+            contexts.add(builder.make());
+
 
             gtcIndex++;
         }
@@ -427,18 +447,18 @@ public class GtcToVcf extends CommandLineProgram {
     //Uses Manhattan distance conversion
     private EuclideanValues polarToEuclidean(float r, float rDeviation, float theta, float thetaDeviation) {
         //calculate variance (deviation^2)
-        double thetaVariance = Math.pow(thetaDeviation, 2.0);
-        double rVariance = Math.pow(rDeviation, 2.0);
+        final double thetaVariance = Math.pow(thetaDeviation, 2.0);
+        final double rVariance = Math.pow(rDeviation, 2.0);
 
-        double halfPi = Math.PI / 2;
+        final double halfPi = Math.PI / 2;
 
         //calculate X and Y variances from R and Theta variances
-        double thetaVarianceFactorX = -1 * (halfPi * r) * Math.pow((1 + Math.tan(halfPi * theta)), -2) * (1 / Math.pow(Math.cos(halfPi * theta), 2));
-        double rVarianceFactorX = 1 / (1 + Math.tan(halfPi * theta));
-        double varianceX = (Math.pow(thetaVarianceFactorX, 2) * thetaVariance) + (Math.pow(rVarianceFactorX, 2) * rVariance);
-        double thetaVarianceFactorY = -1 * thetaVarianceFactorX;
-        double rVarianceFactorY = 1 - rVarianceFactorX;
-        double varianceY = (Math.pow(thetaVarianceFactorY, 2) * thetaVariance) + (Math.pow(rVarianceFactorY, 2) * rVariance);
+        final double thetaVarianceFactorX = -1 * (halfPi * r) * Math.pow((1 + Math.tan(halfPi * theta)), -2) * (1 / Math.pow(Math.cos(halfPi * theta), 2));
+        final double rVarianceFactorX = 1 / (1 + Math.tan(halfPi * theta));
+        final double varianceX = (Math.pow(thetaVarianceFactorX, 2) * thetaVariance) + (Math.pow(rVarianceFactorX, 2) * rVariance);
+        final double thetaVarianceFactorY = -1 * thetaVarianceFactorX;
+        final double rVarianceFactorY = 1 - rVarianceFactorX;
+        final double varianceY = (Math.pow(thetaVarianceFactorY, 2) * thetaVariance) + (Math.pow(rVarianceFactorY, 2) * rVariance);
 
         /*
             Theta quantifies the relative amount of signal measured by the A and B intensities, defined by the equation:
@@ -447,10 +467,10 @@ public class GtcToVcf extends CommandLineProgram {
             So Theta = 1/(2pi) * arctan(1/XY) and R = X + Y
          */
 
-        double meanX = r / (1 + Math.tan(theta * halfPi));
-        double meanY = r - (r / (1 + Math.tan(theta * halfPi)));
-        double devX = Math.pow(varianceX, 0.5);
-        double devY = Math.pow(varianceY, 0.5);
+        final double meanX = r / (1 + Math.tan(theta * halfPi));
+        final double meanY = r - (r / (1 + Math.tan(theta * halfPi)));
+        final double devX = Math.pow(varianceX, 0.5);
+        final double devY = Math.pow(varianceY, 0.5);
 
         return new EuclideanValues((float) meanX, (float) meanY, (float) devX, (float) devY);
     }
@@ -464,6 +484,7 @@ public class GtcToVcf extends CommandLineProgram {
             this.devX = devX;
             this.devY = devY;
         }
+
     }
 
     private Genotype getGenotype(final InfiniumGTCFile infiniumGTCFile,
@@ -503,7 +524,7 @@ public class GtcToVcf extends CommandLineProgram {
 
     private String formatFloatForVcf(final float value) {
         if (Float.isNaN(value)) {
-            return ".";
+            return dot;
         }
         return df.format(value);
     }
@@ -517,29 +538,28 @@ public class GtcToVcf extends CommandLineProgram {
                           final SAMSequenceDictionary dict,
                           final VCFHeader vcfHeader) {
 
-        final VariantContextWriter writer = new VariantContextWriterBuilder()
+        try (final VariantContextWriter writer = new VariantContextWriterBuilder()
                 .setOutputFile(output)
                 .setReferenceDictionary(dict)
                 .setOptions(VariantContextWriterBuilder.DEFAULT_OPTIONS)
-                .build();
+                .build()) {
 
-        writer.writeHeader(vcfHeader);
+            writer.writeHeader(vcfHeader);
 
-        for (final VariantContext variant : variants) {
-            if (variant.getAlternateAlleles().size() > 1) {
-                variant.getCommonInfo().addFilter(InfiniumVcfFields.TRIALLELIC);
+            for (final VariantContext variant : variants) {
+                if (variant.getAlternateAlleles().size() > 1) {
+                    variant.getCommonInfo().addFilter(InfiniumVcfFields.TRIALLELIC);
+                }
+
+                writer.add(variant);
             }
-
-            writer.add(variant);
         }
-
-        writer.close();
     }
 
     private VCFHeader createVCFHeader(final ExtendedIlluminaManifest manifest,
                                       final InfiniumGTCFile gtcFile,
                                       final String gtcGender,
-                                      File clusterFile,
+                                      final File clusterFile,
                                       final File reference,
                                       final SAMSequenceDictionary dict) {
         final String inputName = INPUT.getName();
@@ -548,8 +568,8 @@ public class GtcToVcf extends CommandLineProgram {
         final Set<VCFHeaderLine> lines = new LinkedHashSet<>();
         lines.add(new VCFHeaderLine("fileDate", new Date().toString()));
         lines.add(new VCFHeaderLine("source", "BPM file"));
-        String descriptorFileName = manifest.getDescriptorFileName();
-        lines.add(new VCFHeaderLine(InfiniumVcfFields.ARRAY_TYPE, descriptorFileName.substring(0, descriptorFileName.lastIndexOf("."))));
+        final String descriptorFileName = manifest.getDescriptorFileName();
+        lines.add(new VCFHeaderLine(InfiniumVcfFields.ARRAY_TYPE, descriptorFileName.substring(0, descriptorFileName.lastIndexOf(dot))));
         lines.add(new VCFHeaderLine(InfiniumVcfFields.EXTENDED_ILLUMINA_MANIFEST_FILE, EXTENDED_ILLUMINA_MANIFEST.getName()));
         lines.add(new VCFHeaderLine(InfiniumVcfFields.EXTENDED_ILLUMINA_MANIFEST_VERSION, manifest.getExtendedManifestVersion()));
 
@@ -560,13 +580,13 @@ public class GtcToVcf extends CommandLineProgram {
         //add control codes
         final int measurementCount = gtcFile.getRawControlXIntensities().length / ArraysControlInfo.CONTROL_INFO.length;
         for (int i = 0; i < ArraysControlInfo.CONTROL_INFO.length; i++) {
-            int offset = i * measurementCount;
+            final int offset = i * measurementCount;
             ArraysControlInfo controlInfo = ArraysControlInfo.CONTROL_INFO[i];
-            int redIntensity = gtcFile.getRawControlXIntensity(offset);
-            int greenIntensity = gtcFile.getRawControlYIntensity(offset);
+            final int redIntensity = gtcFile.getRawControlXIntensity(offset);
+            final int greenIntensity = gtcFile.getRawControlYIntensity(offset);
             lines.add(new VCFHeaderLine(controlInfo.getControl(), controlInfo.toString() + "|" + redIntensity + "|" + greenIntensity));
         }
-        lines.add(new VCFHeaderLine(InfiniumVcfFields.FINGERPRINT_GENDER, fingerprintGender.getName()));
+        lines.add(new VCFHeaderLine(InfiniumVcfFields.FINGERPRINT_GENDER, fingerprintGender.name()));
         if (gtcGender != null) {
             lines.add(new VCFHeaderLine(InfiniumVcfFields.AUTOCALL_GENDER, gtcGender));
         } else {

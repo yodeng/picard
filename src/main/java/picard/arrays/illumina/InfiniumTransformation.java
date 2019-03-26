@@ -143,5 +143,4 @@ public class InfiniumTransformation {
     public void setReserved6(float reserved6) {
         this.reserved6 = reserved6;
     }
-
 }

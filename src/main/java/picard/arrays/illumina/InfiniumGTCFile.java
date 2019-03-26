@@ -139,14 +139,14 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @param gtcStream The gtc file input stream.
      * @throws IOException is thrown when there is a problem reading the stream.
      */
-    public InfiniumGTCFile(DataInputStream gtcStream, InfiniumNormalizationManifest normalizationManifest) throws IOException {
+    public InfiniumGTCFile(final DataInputStream gtcStream, final InfiniumNormalizationManifest normalizationManifest) throws IOException {
         super(gtcStream, true);
         this.normalizationManifest = normalizationManifest;
         parse();
         normalizeAndCalculateStatistics();
     }
 
-    InfiniumGTCFile(DataInputStream gtcStream) throws IOException {
+    InfiniumGTCFile(final DataInputStream gtcStream) throws IOException {
         super(gtcStream, true);
         this.normalizationManifest = null;
         parse();
@@ -177,7 +177,7 @@ public class InfiniumGTCFile extends InfiniumDataFile {
         stream.mark(0);
 
         try {
-            byte[] curIdentifier = new byte[3];
+            final byte[] curIdentifier = new byte[3];
             for (int i = 0; i < curIdentifier.length; i++) {
                 curIdentifier[i] = stream.readByte();
             }
@@ -203,14 +203,13 @@ public class InfiniumGTCFile extends InfiniumDataFile {
         if ((normalizationManifest != null) && (normalizationManifest.getNormIds() != null)) {
             normalizeIntensities();
         }
-
     }
 
     private void normalizeIntensities() {
         normalizedXIntensities = new float[numberOfSnps];
         normalizedYIntensities = new float[numberOfSnps];
 
-        int[] normIds = normalizationManifest.getNormIds();
+        final int[] normIds = normalizationManifest.getNormIds();
         for (int i = 0; i < rawXIntensities.length; i++) {
             int rawX = rawXIntensities[i];
             int rawY = rawYIntensities[i];
@@ -247,7 +246,7 @@ public class InfiniumGTCFile extends InfiniumDataFile {
         }
     }
 
-    private int getAllNormIndex(int normId) {
+    private int getAllNormIndex(final int normId) {
         int index = 0;
 
         for (int currentNormId : normalizationManifest.getAllNormIds()) {
@@ -268,7 +267,7 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @param toc    The table of contents record to be parsed.
      * @throws IOException thrown when there is a problem reading the stream.
      */
-    private void readData(DataInputStream stream, InfiniumFileTOC toc) throws IOException {
+    private void readData(final DataInputStream stream, final InfiniumFileTOC toc) throws IOException {
         switch (toc.getTableOfContentsId()) {
             case NUM_SNPS:
                 numberOfSnps = toc.getOffset();
@@ -369,19 +368,19 @@ public class InfiniumGTCFile extends InfiniumDataFile {
         }
     }
 
-    private void parseRedIntensityPercentiles(InfiniumFileTOC toc) throws IOException {
+    private void parseRedIntensityPercentiles(final InfiniumFileTOC toc) throws IOException {
         p05Red = parseShort(toc);
         p50Red = readShort();
         p95Red = readShort();
     }
 
-    private void parseGreenIntensityPercentiles(InfiniumFileTOC toc) throws IOException {
+    private void parseGreenIntensityPercentiles(final InfiniumFileTOC toc) throws IOException {
         p05Green = parseShort(toc);
         p50Green = readShort();
         p95Green = readShort();
     }
 
-    private void parseExtendedSampleData(InfiniumFileTOC toc) throws IOException {
+    private void parseExtendedSampleData(final InfiniumFileTOC toc) throws IOException {
         p50GC = parseFloat(toc);
         numCalls = Integer.reverseBytes(stream.readInt());
         numNoCalls = Integer.reverseBytes(stream.readInt());
@@ -394,7 +393,7 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @param toc The table of contents record to read the scanner information from.
      * @throws IOException is thrown when there is a problem reading the stream.
      */
-    private void parseScannerInfo(InfiniumFileTOC toc) throws IOException {
+    private void parseScannerInfo(final InfiniumFileTOC toc) throws IOException {
         scannerName = parseString(toc);
         pmtGreen = Integer.reverseBytes(stream.readInt());
         pmtRed = Integer.reverseBytes(stream.readInt());
@@ -409,14 +408,14 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @return A string array containing all of the genotype values.
      * @throws IOException is thrown when there is a problem reading the stream.
      */
-    private byte[][] parseGenotypes(InfiniumFileTOC toc) throws IOException {
-        byte[] genotypeBytes = parseByteArray(toc);
-        byte[][] genotypeStrings = new byte[genotypeBytes.length][];
+    private byte[][] parseGenotypes(final InfiniumFileTOC toc) throws IOException {
+        final byte[] genotypeBytes = parseByteArray(toc);
+        final byte[][] genotypeStrings = new byte[genotypeBytes.length][];
 
         for (int i = 0; i < genotypeBytes.length; i++) {
             genotypeStrings[i] = new byte[2];
 
-            byte genotypeByte = genotypeBytes[i];
+            final byte genotypeByte = genotypeBytes[i];
             switch (genotypeByte) {
                 case 0: {
                     genotypeStrings[i][0] = 'N';
@@ -453,10 +452,10 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @return A string array containing all of the basecall values.
      * @throws IOException is thrown when there is a problem reading the stream.
      */
-    private byte[][] parseBaseCalls(InfiniumFileTOC toc) throws IOException {
+    private byte[][] parseBaseCalls(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
-        int arrayLen = Integer.reverseBytes(stream.readInt());
-        byte[][] curBaseCalls = new byte[arrayLen][2];
+        final int arrayLen = Integer.reverseBytes(stream.readInt());
+        final byte[][] curBaseCalls = new byte[arrayLen][2];
         for (int i = 0; i < arrayLen; i++) {
             byte[] baseCallBytes = curBaseCalls[i];
             for (int j = 0; j < baseCallBytes.length; j++) {
@@ -476,10 +475,10 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @param toc The table of contents record to parse the transformation from.
      * @throws IOException is thrown when there is a problem reading the stream.
      */
-    private void parseTransformations(InfiniumFileTOC toc) throws IOException {
+    private void parseTransformations(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
-        int arrayLen = Integer.reverseBytes(stream.readInt());
-        InfiniumTransformation[] transformations = new InfiniumTransformation[arrayLen];
+        final int arrayLen = Integer.reverseBytes(stream.readInt());
+        final InfiniumTransformation[] transformations = new InfiniumTransformation[arrayLen];
         for (int i = 0; i < transformations.length; i++) {
             InfiniumTransformation curTransformation = new InfiniumTransformation();
             curTransformation.setVersion(Integer.reverseBytes(stream.readInt()));
@@ -513,8 +512,8 @@ public class InfiniumGTCFile extends InfiniumDataFile {
      * @param fpIndices The SNP indices for fingerprinting SNPs
      * @return A string representing the sample fingerprint.
      */
-    public String getFingerprintString(Integer[] fpIndices) {
-        StringBuilder fpString = new StringBuilder();
+    public String getFingerprintString(final Integer[] fpIndices) {
+        final StringBuilder fpString = new StringBuilder();
         for (Integer curInt : fpIndices) {
             //gender SNP
             if (curInt == -1) {
@@ -773,5 +772,4 @@ public class InfiniumGTCFile extends InfiniumDataFile {
     public int getAbCalls() {
         return abCalls;
     }
-
 }

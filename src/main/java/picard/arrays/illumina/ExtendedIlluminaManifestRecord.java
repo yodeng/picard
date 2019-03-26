@@ -1,3 +1,27 @@
+/*
+ * The MIT License
+ *
+ * Copyright (c) 2019 The Broad Institute
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 package picard.arrays.illumina;
 
 
@@ -12,7 +36,6 @@ import picard.PicardException;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -56,13 +79,10 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
     private static final int SRC_SEQ_SECOND_VARIANT_SEQUENCE = 3;
     private static final int SRC_SEQ_SEQUENCE_AFTER_VARIANT  = 4;
 
-    private static final Map<String, String> reverseComplement = new HashMap<>();
-    static {
-        reverseComplement.put("A", "T");
-        reverseComplement.put("T", "A");
-        reverseComplement.put("C", "G");
-        reverseComplement.put("G", "C");
-    }
+
+    private static String build36 = "36";
+    private static String build37 = "37";
+    public static final Pattern pattern = Pattern.compile(SRC_SEQ_REGEX);
 
     /**
      * This constructor is used to read records from an already created ExtendedIlluminaManifestRecord file.
@@ -106,7 +126,8 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
     ExtendedIlluminaManifestRecord(final IlluminaManifestRecord record,
                                    final Map<String, ReferenceSequenceFile> referenceFilesMap,
                                    final Map<String, File> chainFilesMap,
-                                   boolean dupe, String passedRsId) {
+                                   final boolean dupe,
+                                   final String passedRsId) {
         super(record);
 
         validate(record, dupe);
@@ -190,7 +211,7 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
             flag = Flag.ILLUMINA_FLAGGED;
         }
 
-        if (!r.getMajorGenomeBuild().trim().equals("36") && !r.getMajorGenomeBuild().trim().equals("37")) {
+        if (!r.getMajorGenomeBuild().trim().equals(build36) && !r.getMajorGenomeBuild().trim().equals(build37)) {
             flag = Flag.UNSUPPORTED_GENOME_BUILD;
         }
     }
@@ -201,7 +222,7 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
     private void liftOverToBuild37(final IlluminaManifestRecord r, final Map<String, File> chainFilesMap) {
 
         // no liftover needed
-        if (r.getMajorGenomeBuild().trim().equals("37")) {
+        if (r.getMajorGenomeBuild().trim().equals(build37)) {
             b37Chr = r.getChr();
             b37Pos = r.getPosition();
 
@@ -231,15 +252,14 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
      * <p>
      * In this context, variant is either a SNP or an indel.
      */
-    private void populateSnpAlleles(final IlluminaManifestRecord record, final ReferenceSequenceFile refFile, final Strand strand)
-            throws PicardException {
+    private void populateSnpAlleles(final IlluminaManifestRecord record, final ReferenceSequenceFile refFile, final Strand strand) {
 
         snpAlleleA = record.getSnp().substring(1, 2);
         snpAlleleB = record.getSnp().substring(3, 4);
 
         if (strand == Strand.NEGATIVE) {
-            snpAlleleA = reverseComplement.get(snpAlleleA);
-            snpAlleleB = reverseComplement.get(snpAlleleB);
+            snpAlleleA = SequenceUtil.reverseComplement(snpAlleleA);
+            snpAlleleB = SequenceUtil.reverseComplement(snpAlleleB);
         }
 
         //extra validation for ambiguous snps
@@ -266,8 +286,7 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
      * <p>
      * In this context, variant is either a SNP or an indel.
      */
-    private void populateIndelAlleles(final IlluminaManifestRecord record, final ReferenceSequenceFile refFile, final Strand strand)
-            throws PicardException {
+    private void populateIndelAlleles(final IlluminaManifestRecord record, final ReferenceSequenceFile refFile, final Strand strand) {
         // Verify that alleleAProbeSeq is at the location it's supposed to be, and that it is found in the source sequence
         final Strand alleleAProbeSeqStrand = getAlleleAProbeSeqStrand(record, refFile);
         if (isBad()) {      // Couldn't find alleleA probe sequence in reference.
@@ -373,13 +392,13 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
     }
 
     private boolean isAorT(String allele) {
-        final String local_allele = allele.toUpperCase();
-        return (local_allele.equals("A") || local_allele.equals("T"));
+        final String localAllele = allele.toUpperCase();
+        return (localAllele.equals("A") || localAllele.equals("T"));
     }
 
     private boolean isCorG(String allele) {
-        final String local_allele = allele.toUpperCase();
-        return (local_allele.equals("C") || local_allele.equals("G"));
+        final String localAllele = allele.toUpperCase();
+        return (localAllele.equals("C") || localAllele.equals("G"));
     }
 
 
@@ -447,9 +466,7 @@ public class ExtendedIlluminaManifestRecord extends IlluminaManifestRecord {
      * V     W   X   Y
      */
     private static Matcher parseSourceSeq(final String sourceSeq) {
-        final Pattern pattern = Pattern.compile(SRC_SEQ_REGEX);
         final Matcher matcher = pattern.matcher(sourceSeq);
-
         if (matcher.find()) {
             return matcher;
         } else {

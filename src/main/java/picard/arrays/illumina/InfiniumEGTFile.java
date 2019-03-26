@@ -56,7 +56,7 @@ public class InfiniumEGTFile extends InfiniumDataFile {
     public String manifestName;
 
 
-    public InfiniumEGTFile(File clusterFile) throws IOException {
+    public InfiniumEGTFile(final File clusterFile) throws IOException {
         super(new DataInputStream(new FileInputStream(clusterFile)), false);
         parse();
     }
@@ -71,13 +71,13 @@ public class InfiniumEGTFile extends InfiniumDataFile {
     }
 
     private void readFileData() throws IOException {
-        int version = parseInt();
+        final int version = parseInt();
         if (version > 9) {
             throw new IOException("Error. Cannot read file - unknown version " + version + " for gentrain data type");
         }
 
         manifestName = parseString();
-        int numCodes = parseInt();
+        final int numCodes = parseInt();
 
         initializeArrays(numCodes);
 
@@ -163,5 +163,4 @@ public class InfiniumEGTFile extends InfiniumDataFile {
         }
         manifestName = parseString();
     }
-
 }

@@ -22,16 +22,16 @@
  * THE SOFTWARE.
  */
 
-package picard.util;
+package picard.pedigree;
 
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-public class GenderTest {
+public class SexTest {
 
-    @DataProvider(name = "testGenderFromStringData")
-    public Object[][] testGenderFromStringDataProvider() {
+    @DataProvider(name = "testSexFromStringData")
+    public Object[][] testSexFromStringDataProvider() {
         return new Object[][] {
                 {"Male", "M"},
                 {"M", "M"},
@@ -44,10 +44,10 @@ public class GenderTest {
         };
     }
 
-    @Test(dataProvider="testGenderFromStringData")
-    public void testGenderFromString(final String name, final String expectedSymbol) {
-        final Gender gender = Gender.fromString(name);
-        Assert.assertEquals(gender.getSymbol(), expectedSymbol);
+    @Test(dataProvider="testSexFromStringData")
+    public void testSexFromString(final String name, final String expectedSymbol) {
+        final Sex sex = Sex.fromString(name);
+        Assert.assertEquals(sex.toSymbol(), expectedSymbol);
     }
 }
 

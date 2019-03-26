@@ -40,9 +40,9 @@ public class InfiniumDataFile {
 
     final DataInputStream stream;
 
-    InfiniumDataFile(DataInputStream stream, boolean cacheStream) throws IOException {
+    InfiniumDataFile(final DataInputStream stream, final boolean cacheStream) throws IOException {
         if (cacheStream) {
-            byte[] data = readStreamIntoByteArray(stream);
+            final byte[] data = readStreamIntoByteArray(stream);
 
             // Don't need to buffer this one because it is sitting in memory
             this.stream = new DataInputStream(new ByteArrayInputStream(data));
@@ -58,11 +58,11 @@ public class InfiniumDataFile {
      * @throws java.io.IOException is thrown when there is a problem reading the stream.
      */
     String parseString() throws IOException {
-        String dataString;
-        byte strLen = stream.readByte();
+        final String dataString;
+        final byte strLen = stream.readByte();
         if (strLen != 0) {
-            byte[] stringBytes = new byte[strLen];
-            int bytesRead = stream.read(stringBytes);
+            final byte[] stringBytes = new byte[strLen];
+            final int bytesRead = stream.read(stringBytes);
             if (bytesRead != stringBytes.length) {
                 throw new IOException("Did not fully read string. Read " + bytesRead + " out of "
                         + stringBytes.length + ".");
@@ -74,8 +74,8 @@ public class InfiniumDataFile {
         return dataString;
     }
 
-    private char[] byteArrayToCharArray(byte[] stringBytes) {
-        char[] chars = new char[stringBytes.length];
+    private char[] byteArrayToCharArray(final byte[] stringBytes) {
+        final char[] chars = new char[stringBytes.length];
         for (int i = 0; i < chars.length; i++) {
             chars[i] = (char) stringBytes[i];
         }
@@ -89,10 +89,10 @@ public class InfiniumDataFile {
      * @return An array of byte values for the given TOC.
      * @throws java.io.IOException is thrown when there is a problem reading the stream.
      */
-    byte[] parseByteArray(InfiniumFileTOC toc) throws IOException {
+    byte[] parseByteArray(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
-        int arrayLen = Integer.reverseBytes(stream.readInt());
-        byte[] byteArray = new byte[arrayLen];
+        final int arrayLen = Integer.reverseBytes(stream.readInt());
+        final byte[] byteArray = new byte[arrayLen];
         for (int i = 0; i < arrayLen; i++) {
             byteArray[i] = stream.readByte();
         }
@@ -106,7 +106,7 @@ public class InfiniumDataFile {
      *              (Java has no unsigned values which is why we promote it to an int)
      * @return The converted int.
      */
-    private int unsignedShortToInt(byte[] bytes) {
+    private int unsignedShortToInt(final byte[] bytes) {
         int integer = 0;
         integer |= bytes[1] & 0xFF;
         integer <<= 8;
@@ -120,7 +120,7 @@ public class InfiniumDataFile {
      * @param bytes The byte array representing the float value.
      * @return The converted float.
      */
-    private float byteArrayToFloat(byte[] bytes) {
+    private float byteArrayToFloat(final byte[] bytes) {
         int tempInt = ((0xff & bytes[0])
                 | ((0xff & bytes[1]) << 8)
                 | ((0xff & bytes[2]) << 16)
@@ -150,7 +150,7 @@ public class InfiniumDataFile {
      * @return The parsed float value.
      * @throws java.io.IOException is thrown when there is a problem reading the stream.
      */
-    float parseFloat(InfiniumFileTOC toc) throws IOException {
+    float parseFloat(final InfiniumFileTOC toc) throws IOException {
         final byte[] floatBytes = new byte[FLOAT_BYTES_LENGTH];
         stream.skipBytes(toc.getOffset());
         stream.readFully(floatBytes);
@@ -165,11 +165,11 @@ public class InfiniumDataFile {
      * (Java has no unsigned values which is why we promote it to an int)
      * @throws java.io.IOException is thrown when there is a problem reading the stream.
      */
-    int[] parseUnsignedShortArray(InfiniumFileTOC toc)
+    int[] parseUnsignedShortArray(final InfiniumFileTOC toc)
             throws IOException {
         final byte[] shortBytes = new byte[2];
         stream.skipBytes(toc.getOffset());
-        int arrayLen = Integer.reverseBytes(stream.readInt());
+        final int arrayLen = Integer.reverseBytes(stream.readInt());
         int[] unsignedShortArray = new int[arrayLen];
         for (int i = 0; i < arrayLen; i++) {
             stream.readFully(shortBytes);
@@ -178,7 +178,7 @@ public class InfiniumDataFile {
         return unsignedShortArray;
     }
 
-    int parseShort(InfiniumFileTOC toc) throws IOException {
+    int parseShort(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
         return readShort();
     }
@@ -189,7 +189,7 @@ public class InfiniumDataFile {
         return unsignedShortToInt(shortBytes);
     }
 
-    int parseInt(InfiniumFileTOC toc) throws IOException {
+    int parseInt(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
         return Integer.reverseBytes(stream.readInt());
     }
@@ -201,7 +201,7 @@ public class InfiniumDataFile {
      * @return The parsed string from the given table of contents.
      * @throws java.io.IOException thrown when there is an error reading the data stream.
      */
-    String parseString(InfiniumFileTOC toc) throws IOException {
+    String parseString(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
         return parseString();
     }
@@ -213,11 +213,11 @@ public class InfiniumDataFile {
      * @return An array of float values for the given TOC.
      * @throws java.io.IOException is thrown when there is a problem reading the stream.
      */
-    float[] parseFloatArray(InfiniumFileTOC toc) throws IOException {
+    float[] parseFloatArray(final InfiniumFileTOC toc) throws IOException {
         stream.skipBytes(toc.getOffset());
-        int arrayLen = Integer.reverseBytes(stream.readInt());
+        final int arrayLen = Integer.reverseBytes(stream.readInt());
 
-        float[] floatArray = new float[arrayLen];
+        final float[] floatArray = new float[arrayLen];
         for (int i = 0; i < arrayLen; i++) {
             floatArray[i] = parseFloat();
         }
@@ -232,8 +232,8 @@ public class InfiniumDataFile {
      * @return The byte array
      * @throws java.io.IOException Errors reading the stream
      */
-    private byte[] readStreamIntoByteArray(InputStream streamToCache) throws IOException {
-        try (ByteArrayOutputStream outStream = new ByteArrayOutputStream()) {
+    private byte[] readStreamIntoByteArray(final InputStream streamToCache) throws IOException {
+        try (final ByteArrayOutputStream outStream = new ByteArrayOutputStream()) {
             //read the entire inputstream into memory
             IOUtils.copy(streamToCache, outStream);
             return outStream.toByteArray();
@@ -244,7 +244,7 @@ public class InfiniumDataFile {
         return identifier;
     }
 
-    public void setIdentifier(String identifier) {
+    public void setIdentifier(final String identifier) {
         this.identifier = identifier;
     }
 
@@ -260,7 +260,7 @@ public class InfiniumDataFile {
         return fileVersion;
     }
 
-    void setFileVersion(int fileVersion) {
+    void setFileVersion(final int fileVersion) {
         this.fileVersion = fileVersion;
     }
 
@@ -272,12 +272,12 @@ public class InfiniumDataFile {
      */
     InfiniumFileTOC[] getTableOfContents() throws IOException {
 
-        InfiniumFileTOC[] tableOfContents = new InfiniumFileTOC[getNumberOfEntries()];
+        final InfiniumFileTOC[] tableOfContents = new InfiniumFileTOC[getNumberOfEntries()];
 
         //read in the table of contents... order them by offset so that we
         //only have to traverse the input stream once.
         for (int i = 0; i < getNumberOfEntries(); i++) {
-            InfiniumFileTOC toc = new InfiniumFileTOC();
+            final InfiniumFileTOC toc = new InfiniumFileTOC();
             toc.setTableOfContentsId(Short.reverseBytes(stream.readShort()));
             toc.setOffset(Integer.reverseBytes(stream.readInt()));
             tableOfContents[i] = toc;

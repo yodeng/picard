@@ -27,7 +27,11 @@ package picard.arrays.illumina;
 import org.apache.commons.lang.StringUtils;
 import picard.PicardException;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A class to represent a record (line) from an Illumina Manifest [Assay] block
@@ -76,6 +80,9 @@ public class IlluminaManifestRecord {
         INVALID
     }
 
+    private static final Set<String> indels = Stream.of("[D/I]", "[I/D]").collect(Collectors.toSet());
+    private static final Set<String> ambiguouses = Stream.of("[A/T]", "[T/A]", "[G/C]", "[C/G]").collect(Collectors.toSet());
+
     IlluminaManifestRecord(final Map<String, Integer> columnNameToIndex, final String[] line, final int index) {
         this.originalLine = line;
         this.index = index;
@@ -85,8 +92,8 @@ public class IlluminaManifestRecord {
         ilmnStrand = getColumnValue(columnNameToIndex, IlluminaManifest.ILLUMINA_STRAND_HEADER_NAME);
 
         snp = getColumnValue(columnNameToIndex, IlluminaManifest.SNP_HEADER_NAME).toUpperCase();         // This is of the form [A/T] or [D/I].
-        isIndel = (getSnp().equals("[I/D]")) || (getSnp().equals("[D/I]"));
-        isAmbiguous = (getSnp().equals("[A/T]")) || (getSnp().equals("[T/A]")) || (getSnp().equals("[G/C]")) || (getSnp().equals("[C/G]"));
+        isIndel = indels.contains(getSnp());
+        isAmbiguous = ambiguouses.contains(getSnp());
         addressAId = getColumnValue(columnNameToIndex, IlluminaManifest.ADDRESS_A_ID_HEADER_NAME);
         alleleAProbeSeq = getColumnValue(columnNameToIndex, IlluminaManifest.ALLELE_A_PROBE_SEQ_HEADER_NAME);
         addressBId = getColumnValue(columnNameToIndex, IlluminaManifest.ADDRESS_B_ID_HEADER_NAME);
