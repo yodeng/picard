@@ -25,8 +25,6 @@
 
 package picard.fingerprint;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import htsjdk.samtools.BamFileIoUtils;
 import htsjdk.samtools.metrics.MetricsFile;
 import htsjdk.samtools.util.CollectionUtil;
@@ -52,7 +50,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static picard.fingerprint.CrosscheckFingerprints.CrosscheckMode.CHECK_SAME_SAMPLE;
 
