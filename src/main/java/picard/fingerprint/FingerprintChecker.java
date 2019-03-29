@@ -25,11 +25,9 @@
 package picard.fingerprint;
 
 import htsjdk.samtools.*;
-import htsjdk.samtools.filter.NotPrimaryAlignmentFilter;
 import htsjdk.samtools.filter.SamRecordFilter;
 import htsjdk.samtools.filter.SecondaryAlignmentFilter;
 import htsjdk.samtools.util.*;
-import htsjdk.variant.utils.SAMSequenceDictionaryExtractor;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypeLikelihoods;
@@ -154,10 +152,8 @@ public class FingerprintChecker {
      * @return a Map of Sample name to Fingerprint
      */
     public Map<String, Fingerprint> loadFingerprints(final Path fingerprintFile, final String specificSample) {
-        SequenceUtil.assertSequenceDictionariesEqual(this.haplotypes.getHeader().getSequenceDictionary(),
-                VCFFileReader.getSequenceDictionary(fingerprintFile));
-
         final VCFFileReader reader = new VCFFileReader(fingerprintFile, false);
+        checkDictionaryGoodForFingerprinting(reader.getFileHeader().getSequenceDictionary());
 
         if (reader.isQueryable()) {
             return loadFingerprintsFromQueriableReader(reader, specificSample, fingerprintFile);
@@ -165,6 +161,26 @@ public class FingerprintChecker {
             log.warn("Couldn't find index for file " + fingerprintFile + " going to read through it all.");
             return loadFingerprintsFromVariantContexts(reader, specificSample, fingerprintFile);
         }
+    }
+
+    private void checkDictionaryGoodForFingerprinting(final SAMSequenceDictionary sequenceDictionaryToCheck ) {
+        final SAMSequenceDictionary activeDictionary = getActiveDictionary(haplotypes);
+
+        if (sequenceDictionaryToCheck.getSequences().size() < activeDictionary.size()) {
+            throw new IllegalArgumentException("Dictionary on fingerprinted file smaller than that on Haplotype Database!");
+        }
+        SequenceUtil.assertSequenceDictionariesEqual(activeDictionary, sequenceDictionaryToCheck,true);
+    }
+
+    private SAMSequenceDictionary getActiveDictionary(final HaplotypeMap haplotypes){
+        final SAMSequenceDictionary origSequenceDictionary = haplotypes.getHeader().getSequenceDictionary();
+
+        final OptionalInt maxSequenceIndex = haplotypes.getAllSnps().stream().mapToInt(s -> origSequenceDictionary.getSequenceIndex(s.getChrom())).max();
+        if (!maxSequenceIndex.isPresent()) {
+            return origSequenceDictionary;
+        }
+        //plus one since sublist is exclusive of the end.
+        return new SAMSequenceDictionary(origSequenceDictionary.getSequences().subList(0, maxSequenceIndex.getAsInt() + 1));
     }
 
     /**
@@ -179,7 +195,7 @@ public class FingerprintChecker {
      */
     public Map<String, Fingerprint> loadFingerprintsFromNonIndexedVcf(final Path fingerprintFile, final String specificSample) {
         final VCFFileReader reader = new VCFFileReader(fingerprintFile, false);
-        SequenceUtil.assertSequenceDictionariesEqual(this.haplotypes.getHeader().getSequenceDictionary(), SAMSequenceDictionaryExtractor.extractDictionary(fingerprintFile));
+        checkDictionaryGoodForFingerprinting(reader.getFileHeader().getSequenceDictionary());
 
         return loadFingerprintsFromVariantContexts(reader, specificSample, fingerprintFile);
     }
@@ -253,8 +269,7 @@ public class FingerprintChecker {
      */
     public Map<String, Fingerprint> loadFingerprintsFromQueriableReader(final VCFFileReader reader, final String specificSample, final Path source) {
 
-        SequenceUtil.assertSequenceDictionariesEqual(this.haplotypes.getHeader().getSequenceDictionary(),
-                reader.getFileHeader().getSequenceDictionary());
+        checkDictionaryGoodForFingerprinting(reader.getFileHeader().getSequenceDictionary());
 
         final SortedSet<Snp> snps = new TreeSet<>(haplotypes.getAllSnps());
 
@@ -396,8 +411,7 @@ public class FingerprintChecker {
                 .enable(SamReaderFactory.Option.CACHE_FILE_BASED_INDEXES)
                 .open(samFile);
 
-        SequenceUtil.assertSequenceDictionariesEqual(this.haplotypes.getHeader().getSequenceDictionary(),
-                in.getFileHeader().getSequenceDictionary());
+        checkDictionaryGoodForFingerprinting(in.getFileHeader().getSequenceDictionary());
 
         final SamLocusIterator iterator = new SamLocusIterator(in, loci, in.hasIndex());
         iterator.setEmitUncoveredLoci(true);
@@ -515,8 +529,7 @@ public class FingerprintChecker {
         final Map<String, Fingerprint> fingerprintsBySample = new HashMap<>();
 
         try (final SamReader in = SamReaderFactory.makeDefault().enable(CACHE_FILE_BASED_INDEXES).open(samFile)) {
-            SequenceUtil.assertSequenceDictionariesEqual(this.haplotypes.getHeader().getSequenceDictionary(),
-                    in.getFileHeader().getSequenceDictionary());
+            checkDictionaryGoodForFingerprinting(in.getFileHeader().getSequenceDictionary());
 
             final SamLocusIterator iterator = new SamLocusIterator(in, haplotypes.getIntervalList(), in.hasIndex());
             iterator.setEmitUncoveredLoci(true);
